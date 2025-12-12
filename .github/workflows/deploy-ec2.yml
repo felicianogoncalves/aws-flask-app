@@ -26,10 +26,5 @@ jobs:
       - name: Launch EC2 Instance
         run: |
           aws ec2 run-instances \
-            --image-id ami-03c1f788292172a4e \        # Ubuntu 22.04 LTS (eu-west-2)
-            --instance-type t2.micro \
-            --key-name ec2-key \                 
-            --security-group-ids flask-app-sg \
-            --user-data "${{ steps.userdata.outputs.USER_DATA }}" \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
+            --image-id ami-03c1f788292172a4e --instance-type t2.micro --key-name ec2-key --security-group-ids flask-app-sg --user-data "${{ steps.userdata.outputs.USER_DATA }}" --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
             
