@@ -45,14 +45,14 @@ jobs:
           fi
 
           echo "SECURITY_GROUP_ID=$SG_ID" >> $GITHUB_OUTPUT
-          
+
       - name: Launch EC2 Instance
         run: |
           aws ec2 run-instances \
-            --image-id ami-0c02fb7403868ce21 \        # Ubuntu 22.04 LTS (eu-west-1)
+            --image-id ami-03c1f788292172a4e \        # Ubuntu 22.04 LTS (eu-west-1)
             --instance-type t2.micro \
             --key-name ec2-key \                 
             --security-group-ids ${{ steps.sg.outputs.SECURITY_GROUP_ID }} \
             --user-data file://ec2-setup.sh \
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App-Vimaponto}]' \
-            --output table
+            
