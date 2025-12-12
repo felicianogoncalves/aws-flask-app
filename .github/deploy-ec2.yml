@@ -1,0 +1,52 @@
+name: Deploy Flask App to EC2
+
+on:
+  workflow_dispatch:  # Permite acionar manualmente
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Read user data script
+        run: |
+          USER_DATA=$(cat ec2-setup.sh | base64 -w 0)
+          echo "USER_DATA_B64=$USER_DATA" >> $GITHUB_ENV
+
+      - name: Create Security Group (if not exists)
+        id: sg
+        run: |
+          SG_NAME="flask-app-sg"
+          SG_ID=$(aws ec2 describe-security-groups --group-names $SG_NAME --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "not-found")
+          if [ "$SG_ID" = "not-found" ]; then
+            SG_ID=$(aws ec2 create-security-group \
+              --group-name $SG_NAME \
+              --description "Permitir HTTP para Flask app" \
+              --output text)
+            aws ec2 authorize-security-group-ingress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 80 \
+              --cidr 0.0.0.0/0
+          fi
+          echo "SECURITY_GROUP_ID=$SG_ID" >> $GITHUB_OUTPUT
+
+      - name: Launch EC2 Instance
+        run: |
+          aws ec2 run-instances \
+            --image-id ami-0c02fb7403868ce21 \        # Ubuntu 22.04 LTS (eu-west-1)
+            --instance-type t2.micro \
+            --key-name ec2-key \                 
+            --security-group-ids ${{ steps.sg.outputs.SECURITY_GROUP_ID }} \
+            --user-data file://ec2-setup.sh \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App-Vimaponto}]' \
+            --output table
