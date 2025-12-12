@@ -17,42 +17,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-      - name: Read user data script
+      - name: Read and encode user data
+        id: userdata
         run: |
-          USER_DATA=$(cat ec2-setup.sh | base64 -w 0)
-          echo "USER_DATA_B64=$USER_DATA" >> $GITHUB_ENV
-
-      - name: Create Security Group (if not exists)
-        id: sg
-        run: |
-          SG_NAME="flask-app-sg"
-          SG_ID=$(aws ec2 describe-security-groups --group-names "$SG_NAME" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null)
-
-          if [ -z "$SG_ID" ]; then
-            echo "Criando novo security group..."
-            SG_ID=$(aws ec2 create-security-group \
-              --group-name "$SG_NAME" \
-              --description "Permitir HTTP para Flask app" \
-              --output text)
-            echo "Autorizando porta 80..."
-            aws ec2 authorize-security-group-ingress \
-              --group-id "$SG_ID" \
-              --protocol tcp \
-              --port 80 \
-              --cidr 0.0.0.0/0
-          else
-            echo "Security group '$SG_NAME' já existe. Usando ID: $SG_ID"
-          fi
-
-          echo "SECURITY_GROUP_ID=$SG_ID" >> $GITHUB_OUTPUT
+          ENCODED=$(base64 -w 0 ec2-setup.sh)
+          echo "USER_DATA=$ENCODED" >> $GITHUB_OUTPUT
 
       - name: Launch EC2 Instance
         run: |
           aws ec2 run-instances \
-            --image-id ami-03c1f788292172a4e \        # Ubuntu 22.04 LTS (eu-west-1)
+            --image-id ami-03c1f788292172a4e \        # Ubuntu 22.04 LTS (eu-west-2)
             --instance-type t2.micro \
             --key-name ec2-key \                 
-            --security-group-ids ${{ steps.sg.outputs.SECURITY_GROUP_ID }} \
-            --user-data file://ec2-setup.sh \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App-Vimaponto}]' \
+            --security-group-ids flask-app-sg \
+            --user-data "${{ steps.userdata.outputs.USER_DATA }}" \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
             
