@@ -1,113 +1,138 @@
-AWS Flask App
+AWS Flask App – CI/CD with Docker on EC2
 
-A simple Flask web application deployed on AWS EC2 with CI/CD automation via GitHub Actions.
+This project demonstrates a complete end-to-end deployment of a Flask web application on AWS EC2 using Docker and GitHub Actions.
 
----
+It covers application containerization, infrastructure provisioning, and automated deployment, following real-world DevOps practices.
 
-Project Overview
+----------------------------------------------------------------
 
-This project demonstrates a full AWS DevOps workflow:
+ARCHITECTURE OVERVIEW
 
-- Python Flask application (CRUD example)
-- Docker containerization
-- Automatic deployment to EC2 using GitHub Actions
-- Basic monitoring and logging
-- Designed for learning and showcasing AWS cloud and DevOps skills
+Developer
+→ GitHub Repository
+→ GitHub Actions (CI/CD)
+→ AWS EC2 (Ubuntu)
+→ Docker
+→ Flask Application
 
----
+----------------------------------------------------------------
 
-Technologies Used
+KEY FEATURES
 
-- Python 3.x
-- Flask
-- Docker
-- AWS EC2
-- GitHub Actions (CI/CD)
-- Bash scripting for EC2 setup
+- Automated EC2 provisioning using AWS CLI
+- Secure SSH access using AWS Key Pair and GitHub Secrets
+- Dockerized Flask application
+- Docker port mapping (80:5000)
+- Fully automated deployment pipeline
+- Publicly accessible web application via EC2 Public IP
 
----
+----------------------------------------------------------------
 
-Features
+TECH STACK
 
-- Flask web application with a simple web page
-- Automatic build and deployment to AWS EC2 using GitHub Actions
-- Organized folder structure and requirements.txt
-- Fully automated EC2 setup with ec2-setup.sh
-- Demonstrates practical AWS DevOps concepts:
-  - Continuous Integration / Continuous Deployment
-  - Infrastructure as Code principles
-  - Security Group configuration for controlled access
+Cloud: AWS (EC2, IAM, Security Groups)
+CI/CD: GitHub Actions
+Containerization: Docker
+Backend: Python, Flask
+Operating System: Ubuntu Linux
 
----
+----------------------------------------------------------------
 
-Architecture
+FLASK APPLICATION
 
-GitHub Actions --> Docker build --> EC2 (Flask app)
-                   │
-                   └── Security Group for HTTP access
+The Flask application runs inside a Docker container and listens on port 5000, following container best practices.
 
-- GitHub Actions: Builds Docker image and deploys to EC2 on push to main branch
-- EC2 Instance: Hosts the Flask application
-- Security Group: Restricts access to HTTP (port 80)
+Application configuration:
 
-(Optional: add a diagram image here for better visualization)
+app.run(host="0.0.0.0", port=5000)
 
----
+Docker exposes the application externally via port 80:
 
-Getting Started
+docker run -d -p 80:5000 flask-app
 
-1. Clone the repository
+This separation between application port and host port reflects real-world production setups.
 
-git clone https://github.com/felicianogoncalves/aws-flask-app.git
-cd aws-flask-app
+----------------------------------------------------------------
 
-2. Setup EC2 instance
+CI/CD PIPELINE (GITHUB ACTIONS)
 
-- Launch EC2 with an Ubuntu AMI
-- Run setup script:
+The GitHub Actions workflow performs the following steps:
 
-bash ec2-setup.sh
+1. Checkout source code
+2. Configure AWS credentials securely using GitHub Secrets
+3. Launch a new EC2 instance
+4. Wait for the instance to become available
+5. Install Docker on the EC2 instance
+6. Copy project files to the instance via SCP
+7. Build the Docker image on EC2
+8. Run the Docker container automatically
 
-- This will:
-  - Install Python3, pip, Flask
-  - Pull Docker container
-  - Start Flask app
+This ensures a reproducible and automated deployment process.
 
-3. Access the App
+----------------------------------------------------------------
 
-- Open your browser and go to:
+SECURITY
 
-http://<your-ec2-public-ip>
+- AWS credentials are stored securely using GitHub Secrets
+- SSH access is managed through an AWS Key Pair
+- Security Group allows inbound traffic on port 80 only
+- No secrets or credentials are hardcoded in the repository
 
----
+----------------------------------------------------------------
 
-Screenshots
+ACCESSING THE APPLICATION
 
-(Add GIF or screenshots of the running app and GitHub Actions workflow here)
+After deployment, the application can be accessed via the EC2 public IP address:
 
----
+http://<EC2_PUBLIC_IP>
 
-Why This Project
+----------------------------------------------------------------
 
-- Demonstrates real AWS cloud deployment
-- Shows ability to create CI/CD pipelines
-- Highlights automation, containerization, and cloud infrastructure management
-- Ideal portfolio piece for DevOps or Cloud Engineer interviews
+LESSONS LEARNED
 
----
+- Difference between container ports and host ports
+- Docker networking and port mapping
+- Debugging real CI/CD deployment issues
+- Importance of consistent port configuration
+- AWS networking fundamentals (VPC, Security Groups, Internet Gateway)
+- Practical troubleshooting in cloud environments
 
-Links
+----------------------------------------------------------------
 
-- GitHub Repository: https://github.com/felicianogoncalves/aws-flask-app
-- AWS Documentation: https://aws.amazon.com/documentation/
+FUTURE IMPROVEMENTS
 
----
+- Use Elastic IP to avoid changing public IPs on redeploy
+- Migrate deployment to ECS Fargate
+- Add an Application Load Balancer
+- Implement health check endpoints
+- Infrastructure as Code using Terraform
+- Improve deployment strategy to avoid recreating EC2 instances
 
-Notes
+----------------------------------------------------------------
 
-- Designed for learning and demonstration purposes
-- Costs: Running an EC2 instance may incur AWS charges
+REFERENCES
 
+AWS EC2 Documentation
+https://docs.aws.amazon.com/ec2/
 
+AWS IAM Documentation
+https://docs.aws.amazon.com/iam/
 
+Docker Documentation
+https://docs.docker.com/
 
+Flask Documentation
+https://flask.palletsprojects.com/
+
+GitHub Actions Documentation
+https://docs.github.com/en/actions
+
+----------------------------------------------------------------
+
+AUTHOR
+
+Feliciano Gonçalves
+Aspiring Cloud / DevOps Engineer
+
+GitHub
+https://github.com/felicianogoncalves
