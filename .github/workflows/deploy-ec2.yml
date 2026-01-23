@@ -23,12 +23,11 @@ jobs:
         echo "${{ secrets.EC2_SSH_KEY }}" > flaskkey.pem
         chmod 600 flaskkey.pem
 
-
     - name: Launch EC2 Instance
       id: ec2
       run: |
         INSTANCE_ID=$(aws ec2 run-instances \
-          --image-id ami-03c1f788292172a4e \
+          --image-id ami-03c1f788292172a4e \  # Ubuntu AMI
           --instance-type t2.micro \
           --key-name flaskkey \
           --security-group-ids flask-app-sg \
@@ -50,16 +49,26 @@ jobs:
           --output text)
         echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_OUTPUT
 
-    - name: Install Docker on EC2
+    - name: Wait for SSH to be ready
+      run: |
+        IP=${{ steps.ip.outputs.PUBLIC_IP }}
+        echo "Waiting for SSH on $IP..."
+        for i in {1..20}; do
+          nc -zv $IP 22 && break
+          echo "SSH not ready yet, waiting 5s..."
+          sleep 5
+        done
+
+    - name: Install Docker on EC2 (Ubuntu)
       run: |
         ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "sudo yum update -y && sudo amazon-linux-extras install docker -y && sudo service docker start && sudo usermod -aG docker ubuntu"
+        "sudo apt update -y && sudo apt install -y docker.io && sudo systemctl start docker"
 
     - name: Copy project to EC2
       run: |
-        scp -o StrictHostKeyChecking=no -i ec2-key.pem -r . ubuntu@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ubuntu/app
+        scp -o StrictHostKeyChecking=no -i flaskkey.pem -r . ubuntu@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ubuntu/app
 
     - name: Build and run Docker container on EC2
       run: |
-        ssh -o StrictHostKeyChecking=no -i ec2-key.pem ec2-user@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "cd /home/ec2-user/app && docker build -t flask-app . && docker run -d -p 80:5000 flask-app"
+        ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
+        "cd /home/ubuntu/app && docker build -t flask-app . && docker run -d -p 80:5000 flask-app"
