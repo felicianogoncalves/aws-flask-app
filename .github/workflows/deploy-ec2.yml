@@ -1,4 +1,4 @@
-name: Deploy Flask App to EC2
+name: Deploy Flask App to EC2 with Docker
 
 on:
   workflow_dispatch:  # Permite acionar manualmente
@@ -6,25 +6,54 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
 
-      - name: Read and encode user data
-        id: userdata
-        run: |
-          ENCODED=$(base64 -w 0 ec2-setup.sh)
-          echo "USER_DATA=$ENCODED" >> $GITHUB_OUTPUT
+    - name: Launch EC2 Instance
+      id: ec2
+      run: |
+        INSTANCE_ID=$(aws ec2 run-instances \
+          --image-id ami-03c1f788292172a4e \
+          --instance-type t2.micro \
+          --key-name ec2-key \
+          --security-group-ids flask-app-sg \
+          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
+          --query 'Instances[0].InstanceId' \
+          --output text)
+        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
-      - name: Launch EC2 Instance
-        run: |
-          aws ec2 run-instances \
-            --image-id ami-03c1f788292172a4e --instance-type t2.micro --key-name ec2-key --security-group-ids flask-app-sg --user-data "${{ steps.userdata.outputs.USER_DATA }}" --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
-            
+    - name: Wait for EC2 instance
+      run: |
+        aws ec2 wait instance-running --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
+
+    - name: Get Public IP
+      id: ip
+      run: |
+        PUBLIC_IP=$(aws ec2 describe-instances \
+          --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }} \
+          --query 'Reservations[0].Instances[0].PublicIpAddress' \
+          --output text)
+        echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_OUTPUT
+
+    - name: Install Docker on EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ec2-key.pem ec2-user@${{ steps.ip.outputs.PUBLIC_IP }} \
+        "sudo yum update -y && sudo amazon-linux-extras install docker -y && sudo service docker start && sudo usermod -aG docker ec2-user"
+
+    - name: Copy project to EC2
+      run: |
+        scp -o StrictHostKeyChecking=no -i ec2-key.pem -r . ec2-user@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ec2-user/app
+
+    - name: Build and run Docker container on EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ec2-key.pem ec2-user@${{ steps.ip.outputs.PUBLIC_IP }} \
+        "cd /home/ec2-user/app && docker build -t flask-app . && docker run -d -p 80:5000 flask-app"
