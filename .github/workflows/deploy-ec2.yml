@@ -27,7 +27,7 @@ jobs:
       id: ec2
       run: |
         INSTANCE_ID=$(aws ec2 run-instances \
-          --image-id ami-03c1f788292172a4e \  # Ubuntu AMI
+          --image-id ami-03c1f788292172a4e \
           --instance-type t2.micro \
           --key-name flaskkey \
           --security-group-ids flask-app-sg \
