@@ -62,7 +62,7 @@ jobs:
     - name: Install Docker on EC2 (Ubuntu)
       run: |
         ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "sudo apt update -y && sudo apt install -y docker.io && sudo systemctl start docker"
+        "sudo apt update -y && sudo apt install -y docker.io && sudo systemctl start docker && sudo usermod -aG docker ubuntu"
 
     - name: Copy project to EC2
       run: |
@@ -71,4 +71,4 @@ jobs:
     - name: Build and run Docker container on EC2
       run: |
         ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "cd /home/ubuntu/app && docker build -t flask-app . && docker run -d -p 80:5000 flask-app"
+        "cd /home/ubuntu/app && sudo docker build -t flask-app . && sudo docker run -d -p 80:5000 flask-app"
