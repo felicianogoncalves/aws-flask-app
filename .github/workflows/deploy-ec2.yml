@@ -18,7 +18,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-west-2
 
-    - name: Create SSH key
+    - name: Use SSH key from Secret
       run: |
         echo "${{ secrets.EC2_SSH_KEY }}" > ec2-key.pem
         chmod 600 ec2-key.pem
@@ -29,7 +29,7 @@ jobs:
         INSTANCE_ID=$(aws ec2 run-instances \
           --image-id ami-03c1f788292172a4e \
           --instance-type t2.micro \
-          --key-name ec2-key \
+          --key-name flaskkey \
           --security-group-ids flask-app-sg \
           --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
           --query 'Instances[0].InstanceId' \
