@@ -19,13 +19,6 @@ App Flask simples, implantada automaticamente numa instância **EC2** na AWS usa
 2. Aguarda ~2 minutos
 3. Acede a ip da instancia criada
 
----
-
-### 💡 Porquê este projeto?
-
-- Estou a tirar o curso **AWS Restart**
-- Aprendi **Python, Flask, Docker, MySQL e infraestrutura cloud**
-
 
 ---
 
