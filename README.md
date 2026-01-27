@@ -142,7 +142,7 @@ https://docs.github.com/en/actions
 AUTHOR
 
 Feliciano Gonçalves
-Cloud / DevOps Engineer
+Cloud / DevOps
 
 GitHub
 https://github.com/felicianogoncalves
