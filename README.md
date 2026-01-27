@@ -1,3 +1,13 @@
+SKILLS DEMONSTRATED
+
+- CI/CD pipeline using GitHub Actions
+- Docker containerization of a Flask application
+- Automated deployment on AWS EC2
+- Secure access using IAM and GitHub Secrets
+- Linux server configuration and troubleshooting
+- Cloud networking (VPC, Security Groups, Internet Gateway)
+
+
 AWS Flask App – CI/CD with Docker on EC2
 
 This project demonstrates a complete end-to-end deployment of a Flask web application on AWS EC2 using Docker and GitHub Actions.
