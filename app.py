@@ -6,9 +6,13 @@ app = Flask(__name__)
 def home():
     return render_template("index.html")
 
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+    
 if __name__ =="__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
 
-#host="0.0.0.0" → permite acesso de fora da própria máquina (senão só aceita localhost)
-#port=5000 → porta para docker
-#debug=False → nunca usar debug=True em produção (segurança!)
+# host="0.0.0.0" → permite acesso externo (necessário para Docker/EC2)
+# port=5000 → porta interna do container
+# debug=False → nunca usar debug=True em produção
