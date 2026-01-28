@@ -1,4 +1,4 @@
-name: Deploy Flask App to EC2 with Docker
+name: Deploy Flask App to Temporary EC2
 
 on:
   workflow_dispatch:
@@ -6,80 +6,81 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-west-2
+      - name: Get short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-    - name: Prepare SSH key from GitHub Secret
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" > flaskkey.pem
-        chmod 600 flaskkey.pem
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
 
-    - name: Launch EC2 Instance
-      id: ec2
-      run: |
-        INSTANCE_ID=$(aws ec2 run-instances \
-          --image-id ami-03c1f788292172a4e \
-          --instance-type t2.micro \
-          --key-name flaskkey \
-          --security-group-ids flask-app-sg \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-Test-${{ github.run_id }}}]' \  # ← ALTERADO: nome agora inclui run_id
-          --query 'Instances[0].InstanceId' \
-          --output text)
-        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_OUTPUT
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > flaskkey.pem
+          chmod 600 flaskkey.pem
 
-    - name: Wait for EC2 instance
-      run: |
-        aws ec2 wait instance-running --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
+      - name: Launch EC2 instance
+        id: ec2
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-03c1f788292172a4e \
+            --instance-type t2.micro \
+            --key-name flaskkey \
+            --security-group-ids flask-app-sg \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=Flask-Test-${{ github.run_id }}}]" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
-    - name: Get Public IP
-      id: ip
-      run: |
-        PUBLIC_IP=$(aws ec2 describe-instances \
-          --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }} \
-          --query 'Reservations[0].Instances[0].PublicIpAddress' \
-          --output text)
-        echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_OUTPUT
+      - name: Wait for instance to be running
+        run: aws ec2 wait instance-running --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
 
-    - name: Wait for SSH to be ready
-      run: |
-        IP=${{ steps.ip.outputs.PUBLIC_IP }}
-        echo "Waiting for SSH on $IP..."
-        for i in {1..20}; do
-          nc -zv $IP 22 && break
-          echo "SSH not ready yet, waiting 5s..."
-          sleep 5
-        done
+      - name: Get public IP
+        id: ip
+        run: |
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_OUTPUT
 
-    - name: Install Docker on EC2 (Ubuntu)
-      run: |
-        ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "sudo apt update -y && sudo apt install -y docker.io && sudo systemctl start docker && sudo usermod -aG docker ubuntu"
+      - name: Wait for SSH
+        run: |
+          IP=${{ steps.ip.outputs.PUBLIC_IP }}
+          for i in {1..20}; do
+            if nc -z $IP 22; then
+              echo "SSH ready"
+              break
+            fi
+            sleep 5
+          done
 
-    - name: Copy project to EC2
-      run: |
-        scp -o StrictHostKeyChecking=no -i flaskkey.pem -r . ubuntu@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ubuntu/app
+      - name: Install Docker on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
+            "sudo apt update -y && sudo apt install -y docker.io && sudo usermod -aG docker ubuntu"
 
-    - name: Build and run Docker container on EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "cd /home/ubuntu/app && \
-         sudo docker build -t flask-app:${{ github.sha::7 }} . && \  # ← ALTERADO: imagem agora tem tag do commit
-         sudo docker stop flask-app 2>/dev/null || true && \        # ← ADICIONADO: para container antigo
-         sudo docker rm flask-app 2>/dev/null || true && \          # ← ADICIONADO: remove container antigo
-         sudo docker run -d -p 80:5000 --name flask-app flask-app:${{ github.sha::7 }}"  # ← ALTERADO: usa tag no run
+      - name: Copy project to EC2
+        run: |
+          scp -o StrictHostKeyChecking=no -i flaskkey.pem -r . ubuntu@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ubuntu/app
 
-    # ↓↓↓ ABAIXO: STEP TOTALMENTE NOVO ↓↓↓
-    - name: Terminate EC2 instance
-      if: always()
-      run: |
-        aws ec2 terminate-instances --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
-        echo "Instância ${{ steps.ec2.outputs.INSTANCE_ID }} terminada."
+      - name: Build and run Docker container (versioned)
+        run: |
+          ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
+            "cd /home/ubuntu/app && \
+             sudo docker build -t flask-app:${{ env.SHORT_SHA }} . && \
+             sudo docker stop flask-app 2>/dev/null || true && \
+             sudo docker rm flask-app 2>/dev/null || true && \
+             sudo docker run -d -p 80:5000 --name flask-app flask-app:${{ env.SHORT_SHA }}"
+
+      - name: Terminate EC2 instance (always!)
+        if: always()
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
+          echo "Instância ${{ steps.ec2.outputs.INSTANCE_ID }} terminada."
