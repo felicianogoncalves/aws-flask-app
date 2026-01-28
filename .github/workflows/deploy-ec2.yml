@@ -1,74 +1,32 @@
-name: Deploy Flask App to EC2 with Docker
+name: Deploy Flask App to EC2
 
 on:
-  workflow_dispatch:  # Permite acionar manualmente
+  push:
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-west-2
+      - name: Get short commit SHA
+        id: get_sha
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-    - name: Prepare SSH key from GitHub Secret
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" > flaskkey.pem
-        chmod 600 flaskkey.pem
-
-    - name: Launch EC2 Instance
-      id: ec2
-      run: |
-        INSTANCE_ID=$(aws ec2 run-instances \
-          --image-id ami-03c1f788292172a4e \
-          --instance-type t2.micro \
-          --key-name flaskkey \
-          --security-group-ids flask-app-sg \
-          --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Flask-App}]' \
-          --query 'Instances[0].InstanceId' \
-          --output text)
-        echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_OUTPUT
-
-    - name: Wait for EC2 instance
-      run: |
-        aws ec2 wait instance-running --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }}
-
-    - name: Get Public IP
-      id: ip
-      run: |
-        PUBLIC_IP=$(aws ec2 describe-instances \
-          --instance-ids ${{ steps.ec2.outputs.INSTANCE_ID }} \
-          --query 'Reservations[0].Instances[0].PublicIpAddress' \
-          --output text)
-        echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_OUTPUT
-
-    - name: Wait for SSH to be ready
-      run: |
-        IP=${{ steps.ip.outputs.PUBLIC_IP }}
-        echo "Waiting for SSH on $IP..."
-        for i in {1..20}; do
-          nc -zv $IP 22 && break
-          echo "SSH not ready yet, waiting 5s..."
-          sleep 5
-        done
-
-    - name: Install Docker on EC2 (Ubuntu)
-      run: |
-        ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "sudo apt update -y && sudo apt install -y docker.io && sudo systemctl start docker && sudo usermod -aG docker ubuntu"
-
-    - name: Copy project to EC2
-      run: |
-        scp -o StrictHostKeyChecking=no -i flaskkey.pem -r . ubuntu@${{ steps.ip.outputs.PUBLIC_IP }}:/home/ubuntu/app
-
-    - name: Build and run Docker container on EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
-        "cd /home/ubuntu/app && sudo docker build -t flask-app . && sudo docker run -d -p 80:5000 flask-app"
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            # Build com tag única (ex: flask-app:a1b2c3d)
+            sudo docker build -t flask-app:${{ env.SHORT_SHA }} .
+            # Para e remove container antigo
+            sudo docker stop flask-app 2>/dev/null || true
+            sudo docker rm flask-app 2>/dev/null || true
+            # Roda nova versão
+            sudo docker run -d -p 80:5000 --name flask-app flask-app:${{ env.SHORT_SHA }}
