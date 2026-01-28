@@ -1,6 +1,9 @@
+import os
 from flask import Flask, render_template
 
 app = Flask(__name__)
+
+APP_VERSION = os.getenv("APP_VERSION", "dev")
 
 @app.route('/')
 def home():
@@ -8,9 +11,9 @@ def home():
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}, 200
+    return {"status": "ok", "version": APP_VERSION}, 200  
     
-if __name__ =="__main__":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
 
 # host="0.0.0.0" → permite acesso externo (necessário para Docker/EC2)
