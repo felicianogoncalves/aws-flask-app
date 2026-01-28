@@ -1,148 +1,131 @@
-SKILLS DEMONSTRATED
+# AWS Flask App – Ephemeral CI/CD with Downtime Simulation & Rollback
 
-- CI/CD pipeline using GitHub Actions
-- Docker containerization of a Flask application
-- Automated deployment on AWS EC2
-- Secure access using IAM and GitHub Secrets
-- Linux server configuration and troubleshooting
-- Cloud networking (VPC, Security Groups, Internet Gateway)
+This project demonstrates a **realistic DevOps workflow**: automated deployment, intentional failure, downtime observation, and recovery — all on ephemeral AWS infrastructure with zero residual cost.
 
-
-AWS Flask App – CI/CD with Docker on EC2
-
-This project demonstrates a complete end-to-end deployment of a Flask web application on AWS EC2 using Docker and GitHub Actions.
-
-It covers application containerization, infrastructure provisioning, and automated deployment, following real-world DevOps practices.
+Unlike typical "always-up" demos, this lab **intentionally simulates service failure** to validate rollback readiness and operational awareness.
 
 ----------------------------------------------------------------
 
-ARCHITECTURE OVERVIEW
+## SKILLS DEMONSTRATED
 
-Developer
-→ GitHub Repository
-→ GitHub Actions (CI/CD)
-→ AWS EC2 (Ubuntu)
-→ Docker
-→ Flask Application
-
-----------------------------------------------------------------
-
-KEY FEATURES
-
-- Automated EC2 provisioning using AWS CLI
-- Secure SSH access using AWS Key Pair and GitHub Secrets
-- Dockerized Flask application
-- Docker port mapping (80:5000)
-- Fully automated deployment pipeline
-- Publicly accessible web application via EC2 Public IP
+- End-to-end CI/CD pipeline using GitHub Actions  
+- Docker containerization of a Flask application  
+- Ephemeral AWS EC2 provisioning and cleanup  
+- Versioned deployments (Docker images tagged by Git commit)  
+- Health check endpoint with version exposure  
+- Simulated downtime and manual rollback  
+- Secure secret management (GitHub Secrets + IAM)  
+- Linux server automation and networking (Security Groups, SSH)
 
 ----------------------------------------------------------------
 
-TECH STACK
+## ARCHITECTURE OVERVIEW
 
-Cloud: AWS (EC2, IAM, Security Groups)
-CI/CD: GitHub Actions
-Containerization: Docker
-Backend: Python, Flask
-Operating System: Ubuntu Linux
+Developer  
+→ GitHub Repository  
+→ GitHub Actions (CI/CD)  
+→ Temporary AWS EC2 (Ubuntu)  
+→ Docker Container  
+→ Flask Application (`/health` endpoint with version)
 
-----------------------------------------------------------------
-
-FLASK APPLICATION
-
-The Flask application runs inside a Docker container and listens on port 5000, following container best practices.
-
-Application configuration:
-
-app.run(host="0.0.0.0", port=5000)
-
-Docker exposes the application externally via port 80:
-
-docker run -d -p 80:5000 flask-app
-
-This separation between application port and host port reflects real-world production setups.
+*All resources are automatically destroyed after execution.*
 
 ----------------------------------------------------------------
 
-CI/CD PIPELINE (GITHUB ACTIONS)
+## KEY FEATURES
 
-The GitHub Actions workflow performs the following steps:
-
-1. Checkout source code
-2. Configure AWS credentials securely using GitHub Secrets
-3. Launch a new EC2 instance
-4. Wait for the instance to become available
-5. Install Docker on the EC2 instance
-6. Copy project files to the instance via SCP
-7. Build the Docker image on EC2
-8. Run the Docker container automatically
-
-This ensures a reproducible and automated deployment process.
+- ✅ **Ephemeral Infrastructure**: EC2 instance created and terminated within the same workflow  
+- ✅ **Versioned Artifacts**: Docker image tagged with Git commit SHA (`flask-app:a1b2c3d`)  
+- ✅ **Health Check**: `GET /health` returns `{"status": "ok", "version": "a1b2c3d"}`  
+- ✅ **Downtime Simulation**: Service is stopped for 1 minute to observe failure  
+- ✅ **Rollback Validation**: Same container is redeployed to restore service  
+- ✅ **Zero Cost Residual**: No lingering resources after workflow completion  
+- ✅ **Secure Automation**: No hardcoded credentials; all secrets via GitHub Secrets
 
 ----------------------------------------------------------------
 
-SECURITY
+## TECH STACK
 
-- AWS credentials are stored securely using GitHub Secrets
-- SSH access is managed through an AWS Key Pair
-- Security Group allows inbound traffic on port 80 only
-- No secrets or credentials are hardcoded in the repository
-
-----------------------------------------------------------------
-
-ACCESSING THE APPLICATION
-
-After deployment, the application can be accessed via the EC2 public IP address:
-
-http://<EC2_PUBLIC_IP>
+- **Cloud**: AWS (EC2, IAM, Security Groups)  
+- **CI/CD**: GitHub Actions  
+- **Containerization**: Docker  
+- **Backend**: Python, Flask  
+- **OS**: Ubuntu Linux  
+- **Networking**: Public IP, Port 80 → 5000 mapping
 
 ----------------------------------------------------------------
 
-LESSONS LEARNED
+## DEPLOYMENT FLOW
 
-- Difference between container ports and host ports
-- Docker networking and port mapping
-- Debugging real CI/CD deployment issues
-- Importance of consistent port configuration
-- AWS networking fundamentals (VPC, Security Groups, Internet Gateway)
-- Practical troubleshooting in cloud environments
+1. Workflow triggered manually via GitHub Actions  
+2. Temporary EC2 instance launched (`t2.micro`, Free Tier eligible)  
+3. Docker installed and app deployed in a versioned container  
+4. **1-minute window**: service live — test via `http://<IP>/health`  
+5. **Container stopped** — service goes offline  
+6. **1-minute downtime**: verify failure (e.g., `/health` unreachable)  
+7. **Rollback**: same container re-created  
+8. **1-minute recovery window**: confirm service restored  
+9. EC2 instance **automatically terminated**
 
-----------------------------------------------------------------
-
-FUTURE IMPROVEMENTS
-
-- Use Elastic IP to avoid changing public IPs on redeploy
-- Migrate deployment to ECS Fargate
-- Add an Application Load Balancer
-- Implement health check endpoints
-- Infrastructure as Code using Terraform
-- Improve deployment strategy to avoid recreating EC2 instances
+> This flow mirrors real-world incident response: detect → observe → recover.
 
 ----------------------------------------------------------------
 
-REFERENCES
+## SECURITY
 
-AWS EC2 Documentation
-https://docs.aws.amazon.com/ec2/
-
-AWS IAM Documentation
-https://docs.aws.amazon.com/iam/
-
-Docker Documentation
-https://docs.docker.com/
-
-Flask Documentation
-https://flask.palletsprojects.com/
-
-GitHub Actions Documentation
-https://docs.github.com/en/actions
+- AWS credentials stored in **GitHub Secrets**  
+- SSH access via AWS Key Pair (private key never committed)  
+- Security Group allows only:
+  - Port 22 (SSH) from GitHub Actions IPs  
+  - Port 80 (HTTP) from anywhere  
+- No secrets in code or logs
 
 ----------------------------------------------------------------
 
-AUTHOR
+## ACCESSING THE APPLICATION
 
-Feliciano Gonçalves
-Cloud / DevOps
+During workflow execution, access the app at:  
+`http://<EC2_PUBLIC_IP>`  
+or the health endpoint:  
+`http://<EC2_PUBLIC_IP>/health`
 
-GitHub
-https://github.com/felicianogoncalves
+> ⏱️ You have ~3 minutes total to test (before auto-termination).
+
+----------------------------------------------------------------
+
+## LESSONS LEARNED
+
+- Importance of **immutable, versioned artifacts** for reliable rollback  
+- Value of **observable downtime** in testing recovery procedures  
+- Why **ephemeral environments** reduce cost and drift  
+- How **health checks** enable automation and monitoring  
+- Practical debugging of CI/CD pipelines in cloud environments  
+- Difference between *deployment* and *operational resilience*
+
+----------------------------------------------------------------
+
+## FUTURE IMPROVEMENTS
+
+- Replace manual rollback with **automated health-check-triggered recovery**  
+- Use **AWS ECS Fargate** to avoid EC2 management  
+- Add **CloudWatch Alarms** for automatic detection  
+- Implement **Infrastructure as Code (Terraform)**  
+- Store Docker images in **ECR** instead of building on EC2  
+- Add **unit/integration tests** in CI phase
+
+----------------------------------------------------------------
+
+## REFERENCES
+
+- [AWS EC2 Documentation](https://docs.aws.amazon.com/ec2/)  
+- [GitHub Actions](https://docs.github.com/en/actions)  
+- [Docker Documentation](https://docs.docker.com/)  
+- [Flask Documentation](https://flask.palletsprojects.com/)  
+
+----------------------------------------------------------------
+
+## AUTHOR
+
+**Feliciano Gonçalves**  
+Cloud / DevOps 
+[GitHub](https://github.com/felicianogoncalves)
