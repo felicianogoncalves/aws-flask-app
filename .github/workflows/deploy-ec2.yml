@@ -86,7 +86,13 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i flaskkey.pem ubuntu@${{ steps.ip.outputs.PUBLIC_IP }} \
             "sudo docker stop flask-app && sudo docker rm flask-app"
-          echo "🛑 Container removido"
+          echo "🛑 Container removido, serviço está DOWN"
+          
+      - name: ⏳ Esperar 1 minuto com serviço OFFLINE
+        run: |
+          echo "🔴 Serviço está caído. Aguarde 1 minuto..."
+          echo "Tente acessar http://${{ steps.ip.outputs.PUBLIC_IP }}/health — deve falhar."
+          sleep 60
 
       - name: Rollback restart same version
         run: |
