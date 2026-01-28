@@ -79,6 +79,12 @@ jobs:
              sudo docker rm flask-app 2>/dev/null || true && \
              sudo docker run -d -p 80:5000 --name flask-app flask-app:${{ env.SHORT_SHA }}"
 
+      - name: Pause for manual testing (5 minutes)
+        run: |
+          echo "✅ Acesse http://${{ steps.ip.outputs.PUBLIC_IP }} para testar"
+          echo "Instância será destruída em 5 minutos."
+          sleep 300
+
       - name: Terminate EC2 instance (always!)
         if: always()
         run: |
