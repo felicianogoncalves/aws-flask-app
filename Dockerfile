@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Recebe a versão durante o build (ex: a1b2c3d)
+ARG VERSION=dev
+ENV APP_VERSION=${VERSION}
+
 # Expose port
 EXPOSE 5000
 
